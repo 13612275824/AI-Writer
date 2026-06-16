@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment Variables
+.env
+
+# Logs
+logs/
+
+# Vector data (too large for GitHub)
+data/vectors/
+
+# Pytest
+.pytest_cache/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# 个人文档（不上传到 GitHub）
+简历_技术栈与专业技能.md
+Worker2_知识点代码对照表.md

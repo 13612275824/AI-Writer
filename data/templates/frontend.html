@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI写作助手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'system-ui', '-apple-system', 'Microsoft YaHei', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc', 400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 800: '#3730a3', 900: '#312e81' },
+                        surface: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .sidebar-btn {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .sidebar-btn:hover {
+            background: rgba(99, 102, 241, 0.08);
+        }
+
+        .sidebar-btn.active {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .panel-enter {
+            animation: panelIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes panelIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .msg-appear {
+            animation: msgIn 0.3s ease-out;
+        }
+
+        @keyframes msgIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95) translateY(4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .input-focus {
+            transition: all 0.2s;
+        }
+
+        .input-focus:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+            outline: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            transition: all 0.2s;
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-outline {
+            transition: all 0.2s;
+        }
+
+        .btn-outline:hover {
+            background: #eef2ff;
+            border-color: #6366f1;
+        }
+
+        .result-box {
+            transition: all 0.3s;
+        }
+
+        .result-box.loading {
+            color: #94a3b8;
+        }
+
+        .card-shadow {
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+        }
+
+        .card-shadow:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
+        }
+    </style>
+</head>
+
+<body class="font-sans bg-surface-50 h-screen flex flex-col text-surface-800 antialiased">
+
+    <!-- Header -->
+    <header class="glass border-b border-surface-200/60 px-6 py-3 flex items-center justify-between z-10">
+        <div class="flex items-center gap-3">
+            <div
+                class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-purple-500 flex items-center justify-center text-white text-lg shadow-lg shadow-brand-500/20">
+                🤖</div>
+            <div>
+                <h1 class="text-base font-semibold text-surface-900">AI写作助手</h1>
+                <p class="text-[11px] text-surface-400 -mt-0.5">{{VERSION}}</p>
+            </div>
+        </div>
+        <a href="/docs" target="_blank"
+            class="text-xs text-surface-400 hover:text-brand-500 transition px-3 py-1.5 rounded-lg hover:bg-brand-50">API
+            文档 ↗</a>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="flex flex-1 overflow-hidden">
+
+        <!-- Sidebar -->
+        <nav class="w-[220px] bg-white border-r border-surface-100 p-3 flex flex-col gap-0.5 overflow-y-auto shrink-0">
+            <p class="text-[10px] font-semibold text-surface-300 uppercase tracking-wider px-3 pt-2 pb-1">智能工具</p>
+            <button class="sidebar-btn active flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium"
+                data-p="chat"><span class="text-base">💬</span> 智能对话</button>
+            <button
+                class="sidebar-btn flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-surface-600"
+                data-p="ask"><span class="text-base">📚</span> 知识库问答</button>
+            <p class="text-[10px] font-semibold text-surface-300 uppercase tracking-wider px-3 pt-4 pb-1">创作中心</p>
+            <button
+                class="sidebar-btn flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-surface-600"
+                data-p="article"><span class="text-base">✍️</span> 文章写作</button>
+            <button
+                class="sidebar-btn flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-surface-600"
+                data-p="copy"><span class="text-base">📝</span> 文案创作</button>
+            <button
+                class="sidebar-btn flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-surface-600"
+                data-p="report"><span class="text-base">📋</span> 工作日志</button>
+            <p class="text-[10px] font-semibold text-surface-300 uppercase tracking-wider px-3 pt-4 pb-1">文本工具</p>
+            <button
+                class="sidebar-btn flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-surface-600"
+                data-p="optimize"><span class="text-base">✨</span> 内容优化</button>
+            <button
+                class="sidebar-btn flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-surface-600"
+                data-p="transfer"><span class="text-base">🎨</span> 风格转换</button>
+            <p class="text-[10px] font-semibold text-surface-300 uppercase tracking-wider px-3 pt-4 pb-1">高级功能</p>
+            <button
+                class="sidebar-btn flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-surface-600"
+                data-p="agent"><span class="text-base">🤝</span> 智能体协作</button>
+            <button
+                class="sidebar-btn flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-surface-600"
+                data-p="docs"><span class="text-base">📂</span> 文档管理</button>
+        </nav>
+
+        <!-- Content Area -->
+        <main
+            class="flex-1 flex flex-col overflow-y-auto p-6 bg-gradient-to-br from-surface-50 via-white to-brand-50/30">
+
+            <!-- ============ 对话面板 ============ -->
+            <div id="chat" class="panel active flex-1 flex flex-col gap-4 panel-enter">
+                <div class="bg-white rounded-2xl card-shadow flex-1 flex flex-col overflow-hidden">
+                    <div class="px-5 py-4 border-b border-surface-100 flex items-center gap-2">
+                        <span class="text-lg">💬</span>
+                        <h3 class="font-semibold text-surface-800">智能对话</h3>
+                        <span class="text-xs text-surface-400 ml-2">与 AI 自由交流</span>
+                    </div>
+                    <div id="chatMsgs"
+                        class="flex-1 overflow-y-auto p-5 flex flex-col gap-3 min-h-[300px] max-h-[calc(100vh-280px)]">
+                        <div
+                            class="msg-appear max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words self-start bg-surface-100 text-surface-700 rounded-bl-md">
+                            你好！我是 AI 写作助手，有什么可以帮你的？</div>
+                    </div>
+                    <div class="px-5 py-4 border-t border-surface-100 flex gap-3 items-center">
+                        <input id="chatIn"
+                            class="flex-1 px-4 py-2.5 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50"
+                            placeholder="输入消息，回车发送..." onkeydown="if(event.key==='Enter')sendChat()">
+                        <button class="btn-primary px-5 py-2.5 rounded-xl text-sm font-medium text-white"
+                            onclick="sendChat()">发送</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ 知识库问答 ============ -->
+            <div id="ask" class="panel flex-1 flex flex-col gap-4 panel-enter" style="display:none">
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center gap-2 mb-4"><span class="text-lg">📚</span>
+                        <h3 class="font-semibold text-surface-800">知识库问答</h3>
+                    </div>
+                    <label class="block text-xs text-surface-500 mb-1.5 mt-0">输入问题</label>
+                    <textarea id="askQ"
+                        class="w-full px-4 py-3 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50 min-h-[80px] resize-y leading-relaxed"
+                        placeholder="基于知识库中的文档提问，例如：项目的主要功能有哪些？"></textarea>
+                    <div class="flex gap-3 mt-3 items-end">
+                        <div><label class="block text-xs text-surface-500 mb-1.5">检索条数</label><input id="askK"
+                                type="number" value="3" min="1" max="10"
+                                class="w-24 px-3 py-2 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50">
+                        </div>
+                        <button class="btn-primary px-6 py-2.5 rounded-xl text-sm font-medium text-white"
+                            onclick="doAsk()">提问</button>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center gap-2 mb-3"><span class="text-lg">📖</span>
+                        <h3 class="font-semibold text-surface-800">回答</h3>
+                    </div>
+                    <div id="askR"
+                        class="result-box bg-surface-50 rounded-xl p-4 min-h-[100px] whitespace-pre-wrap text-sm leading-relaxed border border-surface-100 max-h-[500px] overflow-y-auto break-words">
+                        等待提问...</div>
+                </div>
+            </div>
+
+            <!-- ============ 文章写作 ============ -->
+            <div id="article" class="panel flex-1 flex flex-col gap-4 panel-enter" style="display:none">
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center gap-2 mb-4"><span class="text-lg">✍️</span>
+                        <h3 class="font-semibold text-surface-800">文章写作</h3>
+                    </div>
+                    <label class="block text-xs text-surface-500 mb-1.5 mt-0">主题 <span
+                            class="text-red-400">*</span></label>
+                    <input id="artTopic"
+                        class="w-full px-4 py-2.5 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50"
+                        placeholder="例如：人工智能在教育领域的应用">
+                    <div class="flex gap-3 mt-3">
+                        <div class="flex-1"><label class="block text-xs text-surface-500 mb-1.5">风格</label>
+                            <select id="artStyle"
+                                class="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50">
+                                <option value="">默认</option>
+                                <option>正式</option>
+                                <option>轻松</option>
+                                <option>专业</option>
+                                <option>通俗</option>
+                                <option>学术</option>
+                            </select>
+                        </div>
+                        <div class="flex-1"><label class="block text-xs text-surface-500 mb-1.5">最大 token</label><input
+                                id="artTokens" type="number" placeholder="默认" min="100" max="8000"
+                                class="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50">
+                        </div>
+                    </div>
+                    <label class="block text-xs text-surface-500 mb-1.5 mt-3">要求</label>
+                    <textarea id="artReq"
+                        class="w-full px-4 py-3 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50 min-h-[60px] resize-y leading-relaxed"
+                        placeholder="字数、结构、重点等特殊要求（可选）"></textarea>
+                    <button class="btn-primary px-6 py-2.5 rounded-xl text-sm font-medium text-white mt-4"
+                        onclick="doArticle()">开始写作</button>
+                </div>
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center gap-2 mb-3"><span class="text-lg">📄</span>
+                        <h3 class="font-semibold text-surface-800">生成文章</h3>
+                    </div>
+                    <div id="artR"
+                        class="result-box bg-surface-50 rounded-xl p-4 min-h-[100px] whitespace-pre-wrap text-sm leading-relaxed border border-surface-100 max-h-[500px] overflow-y-auto break-words">
+                        等待生成...</div>
+                </div>
+            </div>
+
+            <!-- ============ 文案创作 ============ -->
+            <div id="copy" class="panel flex-1 flex flex-col gap-4 panel-enter" style="display:none">
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center gap-2 mb-4"><span class="text-lg">📝</span>
+                        <h3 class="font-semibold text-surface-800">文案创作</h3>
+                    </div>
+                    <label class="block text-xs text-surface-500 mb-1.5 mt-0">产品/品牌名称 <span
+                            class="text-red-400">*</span></label>
+                    <input id="cpName"
+                        class="w-full px-4 py-2.5 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50"
+                        placeholder="例如：星辰智能手表">
+                    <div class="flex gap-3 mt-3">
+                        <div class="flex-1"><label class="block text-xs text-surface-500 mb-1.5">文案类型</label>
+                            <select id="cpType"
+                                class="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50">
+                                <option value="product_description">产品描述</option>
+                                <option value="ad_slogan">广告语</option>
+                                <option value="social_media">社交媒体</option>
+                                <option value="brand_story">品牌故事</option>
+                            </select>
+                        </div>
+                        <div class="flex-1"><label class="block text-xs text-surface-500 mb-1.5">目标受众</label><input
+                                id="cpAud"
+                                class="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50"
+                                placeholder="例如：25-35岁白领"></div>
+                    </div>
+                    <label class="block text-xs text-surface-500 mb-1.5 mt-3">品牌语调</label>
+                    <input id="cpTone"
+                        class="w-full px-4 py-2.5 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50"
+                        placeholder="例如：科技感、高端、亲和">
+                    <label class="block text-xs text-surface-500 mb-1.5 mt-3">核心卖点</label>
+                    <textarea id="cpPoints"
+                        class="w-full px-4 py-3 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50 min-h-[60px] resize-y leading-relaxed"
+                        placeholder="主要卖点或亮点"></textarea>
+                    <button class="btn-primary px-6 py-2.5 rounded-xl text-sm font-medium text-white mt-4"
+                        onclick="doCopy()">生成文案</button>
+                </div>
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center gap-2 mb-3"><span class="text-lg">✏️</span>
+                        <h3 class="font-semibold text-surface-800">生成文案</h3>
+                    </div>
+                    <div id="cpR"
+                        class="result-box bg-surface-50 rounded-xl p-4 min-h-[100px] whitespace-pre-wrap text-sm leading-relaxed border border-surface-100 max-h-[500px] overflow-y-auto break-words">
+                        等待生成...</div>
+                </div>
+            </div>
+
+            <!-- ============ 工作日志 ============ -->
+            <div id="report" class="panel flex-1 flex flex-col gap-4 panel-enter" style="display:none">
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center gap-2 mb-4"><span class="text-lg">📋</span>
+                        <h3 class="font-semibold text-surface-800">每日工作日志</h3>
+                    </div>
+                    <div class="flex gap-3">
+                        <div class="flex-1"><label class="block text-xs text-surface-500 mb-1.5">项目名称</label><input
+                                id="rpProj"
+                                class="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50"
+                                placeholder="项目名称"></div>
+                        <div class="flex-1"><label class="block text-xs text-surface-500 mb-1.5">作者</label><input
+                                id="rpAuthor"
+                                class="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50"
+                                placeholder="姓名"></div>
+                    </div>
+                    <label class="block text-xs text-surface-500 mb-1.5 mt-3">完成的工作（每行一项）<span
+                            class="text-red-400">*</span></label>
+                    <textarea id="rpWork"
+                        class="w-full px-4 py-3 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50 min-h-[80px] resize-y leading-relaxed"
+                        placeholder="完成用户模块开发&#10;修复登录 Bug&#10;参加需求评审会议"></textarea>
+                    <label class="block text-xs text-surface-500 mb-1.5 mt-3">遇到的问题（每行一项）</label>
+                    <textarea id="rpIssues"
+                        class="w-full px-4 py-3 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50 min-h-[60px] resize-y leading-relaxed"
+                        placeholder="接口响应超时&#10;测试数据不足"></textarea>
+                    <label class="block text-xs text-surface-500 mb-1.5 mt-3">明日计划（每行一项）</label>
+                    <textarea id="rpPlans"
+                        class="w-full px-4 py-3 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50 min-h-[60px] resize-y leading-relaxed"
+                        placeholder="继续开发订单模块&#10;编写接口文档"></textarea>
+                    <button class="btn-primary px-6 py-2.5 rounded-xl text-sm font-medium text-white mt-4"
+                        onclick="doReport()">生成日志</button>
+                </div>
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center gap-2 mb-3"><span class="text-lg">📊</span>
+                        <h3 class="font-semibold text-surface-800">生成日志</h3>
+                    </div>
+                    <div id="rpR"
+                        class="result-box bg-surface-50 rounded-xl p-4 min-h-[100px] whitespace-pre-wrap text-sm leading-relaxed border border-surface-100 max-h-[500px] overflow-y-auto break-words">
+                        等待生成...</div>
+                </div>
+            </div>
+
+            <!-- ============ 内容优化 ============ -->
+            <div id="optimize" class="panel flex-1 flex flex-col gap-4 panel-enter" style="display:none">
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center gap-2 mb-4"><span class="text-lg">✨</span>
+                        <h3 class="font-semibold text-surface-800">内容优化</h3>
+                    </div>
+                    <label class="block text-xs text-surface-500 mb-1.5 mt-0">待优化内容 <span
+                            class="text-red-400">*</span></label>
+                    <textarea id="optContent"
+                        class="w-full px-4 py-3 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50 min-h-[120px] resize-y leading-relaxed"
+                        placeholder="粘贴需要优化的文本..."></textarea>
+                    <div class="flex gap-3 mt-3">
+                        <div class="flex-1"><label class="block text-xs text-surface-500 mb-1.5">优化类型</label>
+                            <select id="optType"
+                                class="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50">
+                                <option value="polish">润色优化</option>
+                                <option value="simplify">简化改写</option>
+                                <option value="expand">扩写丰富</option>
+                                <option value="shorten">精简缩写</option>
+                                <option value="grammar">语法校对</option>
+                            </select>
+                        </div>
+                        <div class="flex-1"><label class="block text-xs text-surface-500 mb-1.5">目标风格</label>
+                            <select id="optStyle"
+                                class="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50">
+                                <option value="">默认</option>
+                                <option value="formal">正式书面</option>
+                                <option value="casual">轻松口语</option>
+                                <option value="academic">学术论文</option>
+                                <option value="professional">专业商务</option>
+                                <option value="creative">创意文艺</option>
+                            </select>
+                        </div>
+                    </div>
+                    <label class="block text-xs text-surface-500 mb-1.5 mt-3">重点关注</label>
+                    <input id="optFocus"
+                        class="w-full px-4 py-2.5 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50"
+                        placeholder="例如：语法,表达,结构（可选）">
+                    <label class="block text-xs text-surface-500 mb-1.5 mt-3">额外要求</label>
+                    <textarea id="optReq"
+                        class="w-full px-4 py-3 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50 min-h-[50px] resize-y leading-relaxed"
+                        placeholder="保持专业术语不变等（可选）"></textarea>
+                    <button class="btn-primary px-6 py-2.5 rounded-xl text-sm font-medium text-white mt-4"
+                        onclick="doOptimize()">开始优化</button>
+                </div>
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center gap-2 mb-3"><span class="text-lg">✨</span>
+                        <h3 class="font-semibold text-surface-800">优化结果</h3>
+                    </div>
+                    <div id="optR"
+                        class="result-box bg-surface-50 rounded-xl p-4 min-h-[100px] whitespace-pre-wrap text-sm leading-relaxed border border-surface-100 max-h-[500px] overflow-y-auto break-words">
+                        等待优化...</div>
+                </div>
+            </div>
+
+            <!-- ============ 风格转换 ============ -->
+            <div id="transfer" class="panel flex-1 flex flex-col gap-4 panel-enter" style="display:none">
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center gap-2 mb-4"><span class="text-lg">🎨</span>
+                        <h3 class="font-semibold text-surface-800">风格转换</h3>
+                    </div>
+                    <label class="block text-xs text-surface-500 mb-1.5 mt-0">待转换内容 <span
+                            class="text-red-400">*</span></label>
+                    <textarea id="trContent"
+                        class="w-full px-4 py-3 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50 min-h-[120px] resize-y leading-relaxed"
+                        placeholder="粘贴需要转换风格的文本..."></textarea>
+                    <div class="flex gap-3 mt-3">
+                        <div class="flex-1"><label class="block text-xs text-surface-500 mb-1.5">目标风格 <span
+                                    class="text-red-400">*</span></label>
+                            <select id="trTarget"
+                                class="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50">
+                                <option value="formal">正式书面</option>
+                                <option value="casual">轻松口语</option>
+                                <option value="academic">学术论文</option>
+                                <option value="professional">专业商务</option>
+                                <option value="creative">创意文艺</option>
+                                <option value="news">新闻报道</option>
+                                <option value="storytelling">叙事故事</option>
+                            </select>
+                        </div>
+                        <div class="flex-1"><label class="block text-xs text-surface-500 mb-1.5">源风格</label>
+                            <select id="trSource"
+                                class="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50">
+                                <option value="">自动识别</option>
+                                <option value="formal">正式书面</option>
+                                <option value="casual">轻松口语</option>
+                                <option value="academic">学术论文</option>
+                                <option value="professional">专业商务</option>
+                                <option value="creative">创意文艺</option>
+                            </select>
+                        </div>
+                    </div>
+                    <label class="block text-xs text-surface-500 mb-1.5 mt-3">额外要求</label>
+                    <textarea id="trReq"
+                        class="w-full px-4 py-3 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50 min-h-[50px] resize-y leading-relaxed"
+                        placeholder="保留专业术语等（可选）"></textarea>
+                    <button class="btn-primary px-6 py-2.5 rounded-xl text-sm font-medium text-white mt-4"
+                        onclick="doTransfer()">开始转换</button>
+                </div>
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center gap-2 mb-3"><span class="text-lg">🎨</span>
+                        <h3 class="font-semibold text-surface-800">转换结果</h3>
+                    </div>
+                    <div id="trR"
+                        class="result-box bg-surface-50 rounded-xl p-4 min-h-[100px] whitespace-pre-wrap text-sm leading-relaxed border border-surface-100 max-h-[500px] overflow-y-auto break-words">
+                        等待转换...</div>
+                </div>
+            </div>
+
+            <!-- ============ 智能体协作 ============ -->
+            <div id="agent" class="panel flex-1 flex flex-col gap-4 panel-enter" style="display:none">
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center gap-2 mb-1"><span class="text-lg">🤝</span>
+                        <h3 class="font-semibold text-surface-800">智能体协作</h3>
+                    </div>
+                    <p class="text-xs text-surface-400 mb-4">研究 → 写作 → 编辑，多 Agent 流水线协作</p>
+                    <label class="block text-xs text-surface-500 mb-1.5 mt-0">任务描述 <span
+                            class="text-red-400">*</span></label>
+                    <textarea id="agTask"
+                        class="w-full px-4 py-3 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50 min-h-[80px] resize-y leading-relaxed"
+                        placeholder="描述需要多Agent协作完成的复杂写作任务..."></textarea>
+                    <div class="flex gap-3 mt-3 items-end">
+                        <div class="flex-1"><label class="block text-xs text-surface-500 mb-1.5">风格</label><input
+                                id="agStyle"
+                                class="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm input-focus bg-surface-50"
+                                placeholder="写作风格（可选）"></div>
+                        <div class="flex items-center gap-4 pb-1">
+                            <label class="flex items-center gap-2 text-sm text-surface-600 cursor-pointer"><input
+                                    type="checkbox" id="agSkipR"
+                                    class="w-4 h-4 rounded border-surface-300 text-brand-500 focus:ring-brand-400">
+                                跳过研究</label>
+                            <label class="flex items-center gap-2 text-sm text-surface-600 cursor-pointer"><input
+                                    type="checkbox" id="agSkipE"
+                                    class="w-4 h-4 rounded border-surface-300 text-brand-500 focus:ring-brand-400">
+                                跳过编辑</label>
+                        </div>
+                    </div>
+                    <button class="btn-primary px-6 py-2.5 rounded-xl text-sm font-medium text-white mt-4"
+                        onclick="doAgent()">启动协作</button>
+                </div>
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center gap-2 mb-3"><span class="text-lg">🎯</span>
+                        <h3 class="font-semibold text-surface-800">协作结果</h3>
+                    </div>
+                    <div id="agR"
+                        class="result-box bg-surface-50 rounded-xl p-4 min-h-[100px] whitespace-pre-wrap text-sm leading-relaxed border border-surface-100 max-h-[500px] overflow-y-auto break-words">
+                        等待执行（Agent 协作通常需要较长时间，请耐心等待）...</div>
+                </div>
+            </div>
+
+            <!-- ============ 文档管理 ============ -->
+            <div id="docs" class="panel flex-1 flex flex-col gap-4 panel-enter" style="display:none">
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center gap-2 mb-1"><span class="text-lg">📂</span>
+                        <h3 class="font-semibold text-surface-800">文档管理</h3>
+                    </div>
+                    <p class="text-xs text-surface-400 mb-4">上传文档到知识库，支持 PDF / Word / TXT 格式</p>
+                    <div class="flex gap-3 items-end">
+                        <div class="flex-1"><label class="block text-xs text-surface-500 mb-1.5">选择文件</label><input
+                                type="file" id="docFile" accept=".pdf,.docx,.txt"
+                                class="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm bg-surface-50 file:mr-3 file:px-3 file:py-1 file:rounded-lg file:border-0 file:text-sm file:bg-brand-50 file:text-brand-600">
+                        </div>
+                        <button class="btn-primary px-6 py-2.5 rounded-xl text-sm font-medium text-white"
+                            onclick="doUpload()">上传导入</button>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2"><span class="text-lg">📑</span>
+                            <h3 class="font-semibold text-surface-800">已导入文档</h3>
+                        </div>
+                        <button
+                            class="btn-outline px-4 py-2 rounded-xl text-sm font-medium text-brand-500 border border-brand-200"
+                            onclick="loadDocs()">刷新列表</button>
+                    </div>
+                    <div id="docsList"
+                        class="result-box bg-surface-50 rounded-xl p-4 min-h-[60px] text-sm border border-surface-100">
+                        点击刷新查看已导入的文档...</div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        const $ = id => document.getElementById(id);
+        function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML }
+        function toast(msg, ok = true) {
+            const t = document.createElement('div');
+            t.className = 'fixed top-5 right-5 px-5 py-3 rounded-xl text-white text-sm z-50 shadow-lg';
+            t.style.animation = 'fadeIn 0.3s ease-out';
+            t.style.background = ok ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#ef4444,#dc2626)';
+            t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3000);
+        }
+        function setLoading(el, text = '⏳ 处理中，请稍候...') { el.textContent = text; el.classList.add('loading') }
+        function setResult(el, text) { el.textContent = text; el.classList.remove('loading') }
+        function toArr(s) { return s.split('\n').map(x => x.trim()).filter(Boolean) }
+        async function api(url, body) {
+            const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            if (!r.ok) {
+                let msg = 'HTTP ' + r.status;
+                try { const err = await r.json(); if (err.detail) msg = err.detail; } catch (_) { }
+                throw new Error(msg);
+            }
+            return await r.json();
+        }
+
+        // Sidebar navigation
+        document.querySelectorAll('.sidebar-btn').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('.panel').forEach(p => { p.classList.remove('active'); p.style.display = 'none' });
+                document.querySelectorAll('.sidebar-btn').forEach(b => { b.classList.remove('active'); b.classList.add('text-surface-600') });
+                const panel = $(btn.dataset.p);
+                panel.style.display = 'flex'; panel.classList.add('active');
+                panel.classList.remove('panel-enter'); void panel.offsetWidth; panel.classList.add('panel-enter');
+                btn.classList.add('active'); btn.classList.remove('text-surface-600');
+            };
+        });
+
+        // Chat
+        let chatHistory = [];
+        async function sendChat() {
+            const inp = $('chatIn'), text = inp.value.trim(); if (!text) return; inp.value = '';
+            const msgs = $('chatMsgs');
+            const userMsg = document.createElement('div');
+            userMsg.className = 'msg-appear max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words self-end bg-gradient-to-br from-brand-500 to-purple-500 text-white rounded-br-md shadow-md shadow-brand-500/10';
+            userMsg.textContent = text; msgs.appendChild(userMsg);
+            const loading = document.createElement('div');
+            loading.className = 'msg-appear max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed self-start bg-surface-100 text-surface-400 rounded-bl-md';
+            loading.id = 'cLoad';
+            loading.innerHTML = '<span class="inline-flex gap-1"><span class="w-2 h-2 bg-surface-300 rounded-full animate-bounce" style="animation-delay:0s"></span><span class="w-2 h-2 bg-surface-300 rounded-full animate-bounce" style="animation-delay:0.15s"></span><span class="w-2 h-2 bg-surface-300 rounded-full animate-bounce" style="animation-delay:0.3s"></span></span>';
+            msgs.appendChild(loading); msgs.scrollTop = msgs.scrollHeight;
+            chatHistory.push({ role: 'user', content: text });
+            try {
+                const res = await api('/api/chat', { messages: chatHistory });
+                const el = document.getElementById('cLoad'); if (el) el.remove();
+                const aiMsg = document.createElement('div');
+                aiMsg.className = 'msg-appear max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words self-start bg-surface-100 text-surface-700 rounded-bl-md';
+                aiMsg.textContent = res.reply; msgs.appendChild(aiMsg);
+                chatHistory.push({ role: 'assistant', content: res.reply });
+            } catch (e) {
+                const el = document.getElementById('cLoad'); if (el) el.remove();
+                const errMsg = document.createElement('div');
+                errMsg.className = 'msg-appear max-w-[75%] px-4 py-3 rounded-2xl text-sm self-start bg-red-50 text-red-500 rounded-bl-md';
+                errMsg.textContent = '❌ 请求失败: ' + e.message; msgs.appendChild(errMsg);
+            }
+            msgs.scrollTop = msgs.scrollHeight;
+        }
+
+        // Ask
+        async function doAsk() {
+            setLoading($('askR'));
+            try {
+                const res = await api('/api/ask', { query: $('askQ').value, use_retrieval: true, top_k: parseInt($('askK').value) || 3 });
+                let t = res.answer;
+                if (res.sources && res.sources.length) t += '\n\n📎 参考来源: ' + res.sources.join(', ');
+                if (res.elapsed_ms) t += '\n\n⏱ 耗时: ' + res.elapsed_ms + 'ms';
+                setResult($('askR'), t);
+            } catch (e) { setResult($('askR'), '❌ 错误: ' + e.message) }
+        }
+
+        // Article
+        async function doArticle() {
+            if (!$('artTopic').value.trim()) { toast('请输入文章主题', false); return }
+            setLoading($('artR'));
+            try {
+                const body = { topic: $('artTopic').value, style: $('artStyle').value, requirements: $('artReq').value };
+                if ($('artTokens').value) body.max_tokens = parseInt($('artTokens').value);
+                const res = await api('/api/write/article', body);
+                let t = ''; if (res.outline) t += '【大纲】\n' + res.outline + '\n\n';
+                t += '【正文】\n' + res.article;
+                if (res.elapsed_ms) t += '\n\n⏱ 耗时: ' + res.elapsed_ms + 'ms | Tokens: ' + res.total_tokens;
+                setResult($('artR'), t); toast('文章生成成功！');
+            } catch (e) { setResult($('artR'), '❌ 错误: ' + e.message) }
+        }
+
+        // Copy
+        async function doCopy() {
+            if (!$('cpName').value.trim()) { toast('请输入产品名称', false); return }
+            setLoading($('cpR'));
+            try {
+                const res = await api('/api/write/copy', { product_name: $('cpName').value, copy_type: $('cpType').value, target_audience: $('cpAud').value, brand_tone: $('cpTone').value, key_selling_points: $('cpPoints').value });
+                let t = res.content || res.copy;
+                if (res.elapsed_ms) t += '\n\n⏱ 耗时: ' + res.elapsed_ms + 'ms | Tokens: ' + res.total_tokens;
+                setResult($('cpR'), t); toast('文案生成成功！');
+            } catch (e) { setResult($('cpR'), '❌ 错误: ' + e.message) }
+        }
+
+        // Report
+        async function doReport() {
+            const work = toArr($('rpWork').value);
+            if (!work.length) { toast('请输入至少一项工作内容', false); return }
+            setLoading($('rpR'));
+            try {
+                const body = { work_items: work, project_name: $('rpProj').value, author: $('rpAuthor').value };
+                const issues = toArr($('rpIssues').value); if (issues.length) body.issues = issues;
+                const plans = toArr($('rpPlans').value); if (plans.length) body.plans = plans;
+                const res = await api('/api/write/report', body);
+                let t = res.report;
+                if (res.elapsed_ms) t += '\n\n⏱ 耗时: ' + res.elapsed_ms + 'ms | Tokens: ' + res.total_tokens;
+                setResult($('rpR'), t); toast('日志生成成功！');
+            } catch (e) { setResult($('rpR'), '❌ 错误: ' + e.message) }
+        }
+
+        // Optimize
+        async function doOptimize() {
+            if (!$('optContent').value.trim()) { toast('请输入待优化内容', false); return }
+            setLoading($('optR'));
+            try {
+                const body = { content: $('optContent').value, optimize_type: $('optType').value, target_style: $('optStyle').value, focus_areas: $('optFocus').value, requirements: $('optReq').value };
+                const res = await api('/api/optimize', body);
+                let t = res.optimized_content;
+                if (res.summary) t += '\n\n✨ ' + res.summary;
+                if (res.elapsed_ms) t += '\n\n⏱ 耗时: ' + res.elapsed_ms + 'ms | Tokens: ' + res.total_tokens;
+                setResult($('optR'), t); toast('优化完成！');
+            } catch (e) { setResult($('optR'), '❌ 错误: ' + e.message) }
+        }
+
+        // Style transfer
+        async function doTransfer() {
+            if (!$('trContent').value.trim()) { toast('请输入待转换内容', false); return }
+            setLoading($('trR'));
+            try {
+                const body = { content: $('trContent').value, target_style: $('trTarget').value, source_style: $('trSource').value, requirements: $('trReq').value };
+                const res = await api('/api/transfer', body);
+                let t = res.transferred_content;
+                if (res.elapsed_ms) t += '\n\n⏱ 耗时: ' + res.elapsed_ms + 'ms | Tokens: ' + res.total_tokens;
+                setResult($('trR'), t); toast('转换完成！');
+            } catch (e) { setResult($('trR'), '❌ 错误: ' + e.message) }
+        }
+
+        // Agent
+        async function doAgent() {
+            if (!$('agTask').value.trim()) { toast('请输入任务描述', false); return }
+            setLoading($('agR'), '⏳ 智能体协作中（研究→写作→编辑），请耐心等待...');
+            try {
+                const res = await api('/api/agent', { task: $('agTask').value, style: $('agStyle').value || undefined, skip_research: $('agSkipR').checked, skip_edit: $('agSkipE').checked });
+                let t = res.success ? res.output : '❌ 执行失败: ' + (res.error || '未知错误');
+                if (res.elapsed_ms) t += '\n\n⏱ 耗时: ' + res.elapsed_ms + 'ms | 阶段数: ' + res.stage_count + ' | Tokens: ' + res.total_tokens;
+                setResult($('agR'), t); if (res.success) toast('协作完成！');
+            } catch (e) { setResult($('agR'), '❌ 错误: ' + e.message) }
+        }
+
+        // Docs upload
+        async function doUpload() {
+            const file = $('docFile').files[0];
+            if (!file) { toast('请选择文件', false); return }
+            const fd = new FormData(); fd.append('file', file);
+            toast('正在上传...', true);
+            try {
+                const r = await fetch('/api/documents/import', { method: 'POST', body: fd });
+                if (!r.ok) {
+                    let msg = 'HTTP ' + r.status;
+                    try { const err = await r.json(); if (err.detail) msg = err.detail; } catch (_) { }
+                    throw new Error(msg);
+                }
+                const res = await r.json();
+                toast(res.message || '导入成功！'); loadDocs();
+            } catch (e) { toast('上传失败: ' + e.message, false) }
+        }
+        async function loadDocs() {
+            try {
+                const r = await fetch('/api/documents');
+                if (!r.ok) {
+                    let msg = 'HTTP ' + r.status;
+                    try { const err = await r.json(); if (err.detail) msg = err.detail; } catch (_) { }
+                    throw new Error(msg);
+                }
+                const res = await r.json();
+                if (!res.documents || !res.documents.length) { $('docsList').innerHTML = '<span class="text-surface-400">暂无已导入的文档</span>'; return }
+                $('docsList').innerHTML = res.documents.map(d => {
+                    const info = '📄 ' + esc(d.source) + '  <span class="text-surface-400">(' + d.chunk_count + ' 块, ' + d.total_chars + ' 字符)' + (d.file_type ? ' [' + d.file_type + ']' : '') + '</span>';
+                    const safeSrc = esc(d.source).replace(/"/g, '&quot;');
+                    const btn = '<button data-source="' + safeSrc + '" onclick="deleteDoc(this.dataset.source)" class="ml-2 px-3 py-1 rounded-lg text-xs font-medium text-red-500 border border-red-200 hover:bg-red-50 hover:border-red-300 transition shrink-0">删除</button>';
+                    return '<div class="flex items-center justify-between py-2 px-1 border-b border-surface-100 last:border-b-0">' + info + btn + '</div>';
+                }).join('');
+            } catch (e) { $('docsList').innerHTML = '<span class="text-red-500">❌ 加载失败: ' + esc(e.message) + '</span>' }
+        }
+        async function deleteDoc(source) {
+            if (!confirm('确定要删除文档「' + source + '」吗？此操作不可恢复。')) return;
+            try {
+                const params = new URLSearchParams({ source });
+                const r = await fetch('/api/documents?' + params.toString(), { method: 'DELETE' });
+                if (!r.ok) {
+                    let msg = 'HTTP ' + r.status;
+                    try { const err = await r.json(); if (err.detail) msg = err.detail; } catch (_) { }
+                    throw new Error(msg);
+                }
+                toast('文档已删除'); loadDocs();
+            } catch (e) { toast('删除失败: ' + e.message, false) }
+        }
+    </script>
+</body>
+
+</html>

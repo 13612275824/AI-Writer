@@ -1,0 +1,87 @@
+# ============================================================================
+# 日志系统配置文件
+# ============================================================================
+# 本文件定义 Python logging 模块的配置，采用 dictConfig 格式
+# 可直接传递给 logging.config.dictConfig() 进行日志系统初始化
+#
+# 配置结构说明：
+# - version: 配置 schema 版本（固定为 1）
+# - formatters: 定义日志消息的格式化样式
+# - handlers: 定义日志输出目标（控制台、文件等）
+# - root: 根 logger 配置，所有未指定 logger 的日志都由此处理
+#
+# 使用方式：
+#   import logging.config
+#   from src.core.config import get_config
+#   cfg = get_config()
+#   logging.config.dictConfig(cfg.logging_config)
+# ============================================================================
+
+# 配置 schema 版本（固定值，不要修改）
+version: 1
+
+# ---------------------------------------------------------------------------
+# 日志格式化器（Formatters）
+# ---------------------------------------------------------------------------
+# 定义日志消息的输出格式，可使用以下占位符：
+# - %(asctime)s: 时间戳
+# - %(name)s: logger 名称
+# - %(levelname)s: 日志级别（DEBUG/INFO/WARNING/ERROR/CRITICAL）
+# - %(message)s: 日志消息内容
+# - %(filename)s: 文件名
+# - %(lineno)d: 行号
+# - %(funcName)s: 函数名
+formatters:
+  # 默认格式化器，适用于大多数场景
+  default:
+    # 格式示例：2024-01-15 10:30:45,123 - src.core.config - INFO - 配置加载完成
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# ---------------------------------------------------------------------------
+# 日志处理器（Handlers）
+# ---------------------------------------------------------------------------
+# 定义日志输出的目标和过滤规则
+handlers:
+  
+  # 控制台输出处理器
+  # 将日志打印到终端（stdout/stderr），便于开发调试时实时查看
+  console:
+    # 使用 StreamHandler 输出到标准流
+    class: logging.StreamHandler
+    # 使用 default 格式化器
+    formatter: default
+    # 只输出 INFO 及以上级别的日志（DEBUG 不显示）
+    level: INFO
+  
+  # 文件输出处理器
+  # 将日志写入文件，便于后续排查问题和审计
+  file:
+    # 使用 FileHandler 写入文件
+    class: logging.FileHandler
+    # 使用 default 格式化器
+    formatter: default
+    # 日志文件路径（相对于项目根目录）
+    # 建议定期清理或按日期分割，避免文件过大
+    filename: logs/app.log
+    # 记录 DEBUG 及以上级别的所有日志（最详细）
+    level: DEBUG
+    # 显式指定 UTF-8 编码，避免 Windows 系统默认编码导致中文乱码
+    encoding: utf-8
+
+# ---------------------------------------------------------------------------
+# 根 Logger 配置
+# ---------------------------------------------------------------------------
+# 所有未单独配置的 logger 都使用此配置
+root:
+  # 根 logger 的最低日志级别
+  # 设为 DEBUG 以便消息能到达所有 handler，由 handler 自身控制输出级别
+  # - console handler：只输出 INFO 及以上（不显示 DEBUG）
+  # - file handler：输出 DEBUG 及以上（最详细）
+  # 可选值：DEBUG < INFO < WARNING < ERROR < CRITICAL
+  level: DEBUG
+  
+  # 使用的处理器列表
+  # 日志会同时输出到所有指定的处理器
+  handlers:
+    - console   # 输出到控制台
+    - file      # 输出到文件
